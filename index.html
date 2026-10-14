@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Forseo, alive &#xB7; Rive spec</title>
+<meta name="description" content="Forseo, the AI assistant from your concept, rebuilt as a live Rive state machine: every state, trigger, lip-sync and eye-follow input, plus the floating bubble.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Forseo, alive &#xB7; Rive spec">
+<meta property="og:description" content="Forseo, the AI assistant from your concept, rebuilt as a live Rive state machine: every state, trigger, lip-sync and eye-follow input, plus the floating bubble.">
+<meta property="og:image" content="https://akultange.github.io/forseo-rive/img/og.jpg">
+<meta property="og:url" content="https://akultange.github.io/forseo-rive/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0c0b0a">
+<link rel="icon" href="img/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a dark "control room" &#x2014; live stage beside an input console, then the rig inside the client's own app, then the developer handoff. Single dark look on purpose: Forseo lives on a dark app background. */
+:root {
+  --ink: #0c0b0a;
+  --panel: #14120f;
+  --raised: #1d1a16;
+  --line: #2e2923;
+  --text: #f0e8d8;
+  --muted: #a39887;
+  --faint: #6f675c;
+  --gold: #f2be48;
+  --gold-deep: #c9980b;
+  --gold-ink: #1a1203;
+  --display: "Unbounded", "Figtree", system-ui, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--ink); color: var(--text); }
+body {
+  margin: 0;
+  font: 400 16px/1.55 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 56px; }
+a { color: var(--gold); }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* header */
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 32px; padding-top: 36px; }
+.title { display: grid; gap: 10px; min-width: 0; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+h1 { font: 700 clamp(34px, 6vw, 64px)/1.02 var(--display); letter-spacing: -.02em; margin: 0; text-wrap: balance; }
+h1 em { font-style: normal; color: var(--gold); }
+.lede { margin: 0; color: var(--muted); max-width: 60ch; }
+.spec { display: grid; gap: 6px; justify-items: end; text-align: right; }
+.spec .badge { font: 700 12px/1 var(--mono); letter-spacing: .16em; color: var(--gold-ink); background: var(--gold); padding: 8px 12px; border-radius: 4px; }
+.spec small { color: var(--faint); font-size: 13px; }
+
+/* stage + console */
+.lab { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.stage {
+  position: relative; border-radius: 18px; overflow: hidden; border: 1px solid var(--line);
+  background: radial-gradient(120% 90% at 50% 40%, #1d1810 0%, #0e0d0b 55%, #090807 100%);
+  aspect-ratio: 640 / 700; max-width: 100%;
+}
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.readout {
+  position: absolute; left: 14px; top: 14px; display: flex; gap: 8px; flex-wrap: wrap; pointer-events: none;
+}
+.chip { font: 600 12px/1 var(--mono); background: rgba(12, 11, 10, .72); border: 1px solid var(--line); color: var(--text); padding: 7px 9px; border-radius: 999px; }
+.chip b { color: var(--gold); font-weight: 600; }
+.hint { position: absolute; right: 14px; top: 14px; font: 500 13px/1 var(--body); color: var(--muted); background: rgba(12, 11, 10, .7); padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+
+.console { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; display: grid; gap: 22px; min-width: 0; }
+.group { display: grid; gap: 10px; min-width: 0; }
+.group h3 { margin: 0; display: flex; align-items: baseline; gap: 10px; font: 600 15px/1.2 var(--body); }
+.group h3 code { font: 600 12px/1 var(--mono); color: var(--gold); background: var(--raised); padding: 4px 6px; border-radius: 4px; }
+.group p { margin: 0; color: var(--muted); font-size: 14px; }
+.seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.seg button, .keys button, .pill {
+  background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 10px 10px; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; font-weight: 600; font-size: 14px;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.seg button span { font: 600 12px/1 var(--mono); color: var(--faint); }
+.seg button:hover, .keys button:hover, .pill:hover { border-color: #4a4135; }
+.seg button[aria-pressed="true"] { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
+.seg button[aria-pressed="true"] span { color: var(--gold-ink); }
+.keys { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.keys button { justify-content: center; }
+.keys button:active { transform: translateY(1px); }
+.row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; font-weight: 600; font-size: 14px; }
+.switch input { appearance: none; width: 40px; height: 24px; border-radius: 999px; background: var(--raised); border: 1px solid var(--line); position: relative; cursor: pointer; margin: 0; transition: background .15s; }
+.switch input::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: transform .18s, background .18s; }
+.switch input:checked { background: var(--gold-deep); border-color: var(--gold-deep); }
+.switch input:checked::after { transform: translateX(16px); background: #fff6df; }
+.slider { display: grid; grid-template-columns: auto minmax(0, 1fr) 3.2ch; align-items: center; gap: 10px; font: 600 12px/1 var(--mono); color: var(--muted); }
+.slider output { color: var(--gold); text-align: right; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--gold); }
+.say { font-size: 14px; color: var(--muted); min-height: 1.6em; }
+.say .w { transition: color .1s; }
+.say .w.on { color: var(--gold); }
+
+/* app section */
+.section-head { display: grid; gap: 8px; max-width: 70ch; }
+h2 { font: 700 clamp(24px, 3.4vw, 36px)/1.1 var(--display); margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+.section-head p { margin: 0; color: var(--muted); }
+.app { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 36px; align-items: start; }
+.phone {
+  width: 100%; max-width: 380px; justify-self: center; border-radius: 46px; padding: 12px; background: linear-gradient(160deg, #2a2620, #0f0e0c 40%, #1b1813);
+  border: 1px solid #3a342b; box-shadow: 0 30px 80px rgba(0, 0, 0, .55), inset 0 0 0 2px #000;
+}
+.screen { position: relative; border-radius: 36px; overflow: hidden; background: #0c0d0e; }
+.statusbar { height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font: 600 13px/1 var(--body); color: #f2f2f2; background: #0b0b0c; }
+.statusbar i { display: inline-block; width: 22px; height: 11px; border: 1.5px solid #f2f2f2; border-radius: 3px; position: relative; }
+.statusbar i::after { content: ""; position: absolute; inset: 1.5px 5px 1.5px 1.5px; background: #f2f2f2; border-radius: 1px; }
+.appview { position: relative; container-type: inline-size; aspect-ratio: 839 / 1631; background: #0c0d0e center/cover no-repeat; }
+.appview canvas { position: absolute; display: block; transition: transform .55s cubic-bezier(.65, 0, .35, 1), opacity .45s; transform-origin: 50% 50%; }
+.speech {
+  position: absolute; left: 63.6%; top: 11.6%; width: 30.8%; transform: rotate(-4deg); transform-origin: 0 100%;
+  background: rgba(16, 15, 13, .92); border: 1.5px solid rgba(242, 190, 72, .55); border-radius: 2.6cqw; padding: 2.2cqw 2.4cqw 2.4cqw;
+  transition: opacity .35s, transform .45s;
+}
+.speech b { display: block; color: var(--gold); font: 600 3.2cqw/1.2 var(--body); margin-bottom: .6cqw; }
+.speech span { display: block; color: #d9d4ca; font: 400 2.25cqw/1.35 var(--body); }
+.speech::after { content: ""; position: absolute; left: -1.7cqw; bottom: 3cqw; width: 2.6cqw; height: 2.6cqw; background: inherit; border-left: inherit; border-bottom: inherit; transform: rotate(45deg); }
+.speech.gone { opacity: 0; transform: rotate(-4deg) scale(.9); }
+.app-side { display: grid; gap: 22px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.panel h3 { margin: 0; font: 600 16px/1.2 var(--body); }
+.panel p { margin: 0; color: var(--muted); font-size: 14px; }
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { padding: 9px 14px; border-radius: 999px; font-size: 14px; }
+.pill.primary { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+.pill[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.sizes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.size { background: #0c0d0e; border: 1px solid var(--line); border-radius: 12px; display: grid; place-items: center; padding: 14px 6px 10px; gap: 8px; min-width: 0; }
+.size canvas { display: block; }
+.size small { font: 600 12px/1 var(--mono); color: var(--muted); }
+
+/* handoff */
+.handoff { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.tablewrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 520px; }
+caption { text-align: left; padding: 16px 16px 6px; font: 600 15px/1.2 var(--body); color: var(--text); }
+caption code { font: 600 12px/1 var(--mono); color: var(--gold); }
+th, td { text-align: left; padding: 10px 16px; border-top: 1px solid var(--line); vertical-align: top; }
+th { font: 600 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+td code { font: 600 13px/1.3 var(--mono); color: var(--gold); white-space: nowrap; }
+td.t { font: 500 12px/1.3 var(--mono); color: var(--muted); white-space: nowrap; }
+.code { background: #0a0908; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; min-width: 0; }
+.code header { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--line); font: 600 12px/1 var(--mono); color: var(--muted); }
+.code header button { background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; cursor: pointer; font: 600 12px/1 var(--mono); color: var(--text); }
+pre { margin: 0; padding: 16px; overflow-x: auto; font: 400 13px/1.6 var(--mono); color: #e7dfcf; }
+pre .c { color: #7d7466; }
+pre .k { color: #f2be48; }
+pre .s { color: #d7c39a; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.fact { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 4px; }
+.fact b { font: 700 22px/1.1 var(--display); color: var(--text); font-variant-numeric: tabular-nums; }
+.fact span { font-size: 13px; color: var(--muted); }
+.notes { display: grid; gap: 8px; color: var(--muted); font-size: 14px; margin: 0; padding-left: 18px; }
+footer { border-top: 1px solid var(--line); padding-top: 22px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; color: var(--faint); font-size: 13px; }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font: 500 14px/1 var(--mono); }
+
+@media (max-width: 900px) {
+  .lab, .app, .handoff { grid-template-columns: minmax(0, 1fr); }
+  .spec { justify-items: start; text-align: left; }
+}
+@media (max-width: 460px) {
+  .seg { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .keys { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hint { white-space: normal; max-width: 55%; text-align: right; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .appview canvas, .speech { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="title">
+      <div class="eyebrow">Rive state machine &#xB7; built for the Forseo brief</div>
+      <h1>Forseo, <em>alive</em>.</h1>
+      <p class="lede">Your robot rebuilt in moveable layers and running in the real Rive runtime. Every button below drives the same inputs your app will use.</p>
+    </div>
+    <div class="spec">
+      <span class="badge">SPEC</span>
+      <small>Spec piece by Luka Skhiladze.<br>Not licensed for use.</small>
+    </div>
+  </header>
+
+  <section class="lab" aria-label="Live rig">
+    <div class="stage" id="stage">
+      <canvas id="stageCanvas" aria-label="Forseo character, live"></canvas>
+      <div class="readout" aria-live="polite"><span class="chip">state = <b id="roState">0</b> &#xB7; <span id="roName">idle</span></span><span class="chip" id="roTalk" hidden>talk = <b id="roTalkV">0</b></span></div>
+      <div class="hint" id="followHint" hidden>Move your pointer around Forseo</div>
+      <div class="loading" id="loading">Loading the Rive runtime&#x2026;</div>
+    </div>
+
+    <div class="console">
+      <div class="group">
+        <h3>State <code>state</code></h3>
+        <div class="seg" id="stateSeg">
+          <button type="button" id="st0" data-v="0" aria-pressed="true">Idle <span>0</span></button>
+          <button type="button" id="st1" data-v="1" aria-pressed="false">Listening <span>1</span></button>
+          <button type="button" id="st2" data-v="2" aria-pressed="false">Thinking <span>2</span></button>
+          <button type="button" id="st3" data-v="3" aria-pressed="false">Talking <span>3</span></button>
+          <button type="button" id="st4" data-v="4" aria-pressed="false">Working <span>4</span></button>
+          <button type="button" id="st5" data-v="5" aria-pressed="false">Sleeping <span>5</span></button>
+        </div>
+      </div>
+      <div class="group">
+        <h3>Triggers</h3>
+        <div class="keys">
+          <button type="button" id="trHappy" data-t="happy">Happy</button>
+          <button type="button" id="trConfused" data-t="confused">Confused</button>
+          <button type="button" id="trWave" data-t="wave">Wave</button>
+          <button type="button" id="trWake" data-t="wake">Wake</button>
+        </div>
+      </div>
+      <div class="group">
+        <h3>Talking <code>talk</code> <code>lipsync</code></h3>
+        <p>With lip-sync on, the mouth follows <code>talk</code> (0&#x2013;100), so you can feed it your speech volume. With it off, Forseo uses his built-in talking loop.</p>
+        <div class="row">
+          <label class="switch"><input type="checkbox" id="lipsync"> Lip-sync</label>
+          <button type="button" class="pill primary" id="speak">Speak a sample line</button>
+        </div>
+        <label class="slider" for="talk">talk <input type="range" id="talk" min="0" max="100" value="0"><output id="talkOut">0</output></label>
+        <div class="say" id="say" aria-live="polite"></div>
+      </div>
+      <div class="group">
+        <h3>Eye follow <code>follow</code> <code>lookX</code> <code>lookY</code></h3>
+        <div class="row">
+          <label class="switch"><input type="checkbox" id="follow"> Follow the pointer</label>
+          <span class="chip" id="lookOut">lookX 0 &#xB7; lookY 0</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="Inside the Forseo app" style="display:grid; gap:24px">
+    <div class="section-head">
+      <div class="eyebrow">Inside your app</div>
+      <h2>On your home screen, then in the corner.</h2>
+      <p>Your own home screen with the static image swapped for the live rig, and the speech bubble set to "Forseo". The small bubble version is what Forseo turns into on other pages.</p>
+    </div>
+    <div class="app">
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><i aria-hidden="true"></i></div>
+          <div class="appview" id="appview" style="background-image:url(img/app-home.jpg)">
+            <canvas id="heroCanvas" aria-label="Forseo on the home screen"></canvas>
+            <div class="speech" id="speech"><b>I'm Forseo</b><span>Your AI assistant for leads, quotes, scheduling and more.</span></div>
+            <canvas id="bubbleCanvas" aria-label="Floating Forseo bubble"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="app-side">
+        <div class="panel">
+          <h3>Floating bubble</h3>
+          <p>The bubble starts hidden. Fire <code>popIn</code> when it appears and <code>popOut</code> when it's dismissed.</p>
+          <div class="btnrow">
+            <button type="button" class="pill primary" id="toBubble">Send Forseo to the bubble</button>
+            <button type="button" class="pill" id="toHero" disabled>Back to the home screen</button>
+          </div>
+          <div class="btnrow" id="bubbleStates" aria-label="Bubble state">
+            <button type="button" class="pill" id="bs0" data-v="0" aria-pressed="true">Idle</button>
+            <button type="button" class="pill" id="bs1" data-v="1" aria-pressed="false">Listening</button>
+            <button type="button" class="pill" id="bs2" data-v="2" aria-pressed="false">Thinking</button>
+            <button type="button" class="pill" id="bs3" data-v="3" aria-pressed="false">Talking</button>
+            <button type="button" class="pill" id="bs5" data-v="5" aria-pressed="false">Sleeping</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Actual size</h3>
+          <p>The bubble artboard at 64, 72 and 80 px, drawn 1:1 on your app background.</p>
+          <div class="sizes">
+            <div class="size"><canvas id="sz64" width="64" height="64" style="width:64px;height:64px"></canvas><small>64 px</small></div>
+            <div class="size"><canvas id="sz72" width="72" height="72" style="width:72px;height:72px"></canvas><small>72 px</small></div>
+            <div class="size"><canvas id="sz80" width="80" height="80" style="width:80px;height:80px"></canvas><small>80 px</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="Developer handoff" style="display:grid; gap:24px">
+    <div class="section-head">
+      <div class="eyebrow">Handoff</div>
+      <h2>The inputs your developer gets.</h2>
+      <p>Two artboards in one file. Every state is switchable from code with simple inputs, and transitions blend smoothly from any state to any other.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>180 KB</b><span>.riv file, 40 KB gzipped</span></div>
+      <div class="fact"><b>2</b><span>artboards: Forseo + ForseoBubble</span></div>
+      <div class="fact"><b>36</b><span>timelines across 7 state machine layers</span></div>
+      <div class="fact"><b>Vector</b><span>no images; transparent background</span></div>
+    </div>
+    <div class="handoff">
+      <div style="display:grid; gap:16px; min-width:0">
+        <div class="tablewrap">
+          <table>
+            <caption>Artboard <code>Forseo</code> &#xB7; state machine <code>Forseo</code></caption>
+            <thead><tr><th>Input</th><th>Type</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>state</code></td><td class="t">Number</td><td>0 idle &#xB7; 1 listening &#xB7; 2 thinking &#xB7; 3 talking &#xB7; 4 working &#xB7; 5 sleeping (yawns going in, stretches coming out)</td></tr>
+              <tr><td><code>happy</code></td><td class="t">Trigger</td><td>Jump with sparkles, then back to the current state</td></tr>
+              <tr><td><code>confused</code></td><td class="t">Trigger</td><td>Head tilt and a question mark, then back</td></tr>
+              <tr><td><code>wave</code></td><td class="t">Trigger</td><td>Hello wave. Fire it on mount as the intro</td></tr>
+              <tr><td><code>wake</code></td><td class="t">Trigger</td><td>Wakes Forseo from sleep, even if <code>state</code> is still 5</td></tr>
+              <tr><td><code>talk</code></td><td class="t">Number 0&#x2013;100</td><td>Mouth openness while talking, when <code>lipsync</code> is on</td></tr>
+              <tr><td><code>lipsync</code></td><td class="t">Boolean</td><td>On: mouth follows <code>talk</code>. Off: built-in talking loop</td></tr>
+              <tr><td><code>follow</code></td><td class="t">Boolean</td><td>Eyes and head follow <code>lookX</code> / <code>lookY</code></td></tr>
+              <tr><td><code>lookX</code> <code>lookY</code></td><td class="t">Number &#x2212;100&#x2013;100</td><td>Where to look, relative to Forseo's face</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <caption>Artboard <code>ForseoBubble</code> &#xB7; state machine <code>Bubble</code></caption>
+            <thead><tr><th>Input</th><th>Type</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>state</code></td><td class="t">Number</td><td>0 idle &#xB7; 1 listening &#xB7; 2 thinking &#xB7; 3 talking &#xB7; 5 sleeping (4 shows as thinking)</td></tr>
+              <tr><td><code>popIn</code> <code>popOut</code></td><td class="t">Trigger</td><td>Appear and dismiss. The bubble starts hidden</td></tr>
+              <tr><td><code>talk</code> <code>lipsync</code></td><td class="t">Number / Boolean</td><td>Same as the main artboard</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="code">
+        <header><span>@rive-app/canvas</span><button type="button" id="copy">Copy</button></header>
+        <pre id="snippet"><span class="k">import</span> { Rive } <span class="k">from</span> <span class="s">'@rive-app/canvas'</span>;
+
+<span class="k">const</span> forseo = <span class="k">new</span> Rive({
+  src: <span class="s">'forseo.riv'</span>,
+  canvas: document.querySelector(<span class="s">'#forseo'</span>),
+  artboard: <span class="s">'Forseo'</span>,
+  stateMachines: <span class="s">'Forseo'</span>,
+  autoplay: <span class="k">true</span>,
+  onLoad: () =&gt; forseo.resizeDrawingSurfaceToCanvas(),
+});
+<span class="k">const</span> input = (name) =&gt;
+  forseo.stateMachineInputs(<span class="s">'Forseo'</span>).find((i) =&gt; i.name === name);
+
+input(<span class="s">'state'</span>).value = 2;      <span class="c">// thinking</span>
+input(<span class="s">'happy'</span>).fire();          <span class="c">// one-shot reaction</span>
+input(<span class="s">'lipsync'</span>).value = <span class="k">true</span>;
+input(<span class="s">'talk'</span>).value = volume * 100; <span class="c">// each frame while speaking</span>
+input(<span class="s">'follow'</span>).value = <span class="k">true</span>;
+input(<span class="s">'lookX'</span>).value = 40;    <span class="c">// -100 left &#x2026; 100 right</span></pre>
+      </div>
+    </div>
+    <ul class="notes">
+      <li>Transitions blend from any state to any other in about 0.4 s, and a reaction can interrupt a transition, so nothing waits on a previous animation.</li>
+      <li>Blinks come from a separate layer with random timing, so the idle never looks like a loop.</li>
+      <li>The final delivery is the Rive editor file plus the exported .riv. This spec file is watermarked.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>Spec built for the Forseo brief by Luka Skhiladze. Not licensed for use.</span>
+    <span>Runs on the official Rive web runtime</span>
+  </footer>
+</div>
+
+<script src="rive/canvas_advanced.js"></script>
+<script>
+(function () {
+  const NAMES = ["idle", "listening", "thinking", "talking", "working", "sleeping"];
+  const $ = (id) => document.getElementById(id);
+  const b64 = (s) => { const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  async function boot() {
+    const rive = await window.RiveCanvas({ locateFile: () => "rive/rive.wasm" });
+    const rivBytes = new Uint8Array(await (await fetch("forseo.riv")).arrayBuffer());
+    const file = await rive.load(rivBytes);
+    $("loading").hidden = true;
+
+    function inst(ab, sm) {
+      const a = file.artboardByName(ab);
+      const m = new rive.StateMachineInstance(a.stateMachineByName(sm), a);
+      const inputs = {};
+      for (let i = 0; i < m.inputCount(); i++) { const x = m.input(i); inputs[x.name] = x; }
+      return {
+        a, m,
+        num(n, v) { inputs[n].asNumber().value = v; },
+        bool(n, v) { inputs[n].asBool().value = v; },
+        fire(n) { inputs[n].asTrigger().fire(); },
+      };
+    }
+
+    const surfaces = [];
+    function surface(canvas, items) {
+      const s = { canvas, items, r: rive.makeRenderer(canvas), w: 0, h: 0 };
+      surfaces.push(s);
+      return s;
+    }
+    function fit(s) {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w = Math.max(1, Math.round(s.canvas.clientWidth * dpr));
+      const h = Math.max(1, Math.round(s.canvas.clientHeight * dpr));
+      if (w !== s.w || h !== s.h) { s.canvas.width = w; s.canvas.height = h; s.w = w; s.h = h; }
+    }
+
+    // ---------------- stage
+    const stage = inst("Forseo", "Forseo");
+    const stageS = surface($("stageCanvas"), [{ i: stage }]);
+    let curState = 0;
+    function setState(v) {
+      curState = v;
+      stage.num("state", v);
+      $("roState").textContent = v;
+      $("roName").textContent = NAMES[v];
+      document.querySelectorAll("#stateSeg button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.v === v)));
+    }
+    document.querySelectorAll("#stateSeg button").forEach((b) => b.addEventListener("click", () => setState(+b.dataset.v)));
+    document.querySelectorAll(".keys button").forEach((b) => b.addEventListener("click", () => stage.fire(b.dataset.t)));
+
+    // lip-sync + talk slider
+    let lipsync = false, speaking = false, talkVal = 0;
+    function setTalk(v) { talkVal = v; stage.num("talk", v); $("talk").value = Math.round(v); $("talkOut").textContent = Math.round(v); $("roTalkV").textContent = Math.round(v); }
+    $("lipsync").addEventListener("change", (e) => { lipsync = e.target.checked; stage.bool("lipsync", lipsync); $("roTalk").hidden = !lipsync; });
+    $("talk").addEventListener("input", (e) => {
+      if (!lipsync) { lipsync = true; $("lipsync").checked = true; stage.bool("lipsync", true); $("roTalk").hidden = false; }
+      if (curState !== 3) setState(3);
+      setTalk(+e.target.value);
+    });
+
+    // sample line: word timing from speech synthesis when available, otherwise a fixed cadence
+    const LINE = "Hi Waldemar! You have three new leads and two quotes waiting for you.";
+    const words = LINE.split(" ");
+    $("say").innerHTML = words.map((w, i) => '<span class="w" data-i="' + i + '">' + w + "</span>").join(" ");
+    let bumps = [];
+    function wordBump(w, t0) {
+      const syl = Math.max(1, Math.round(w.replace(/[^a-z]/gi, "").length / 3));
+      for (let k = 0; k < syl; k++) bumps.push({ t: t0 + k * 0.13, peak: 65 + Math.random() * 35 });
+    }
+    function lightWord(i) { document.querySelectorAll("#say .w").forEach((el) => el.classList.toggle("on", +el.dataset.i === i)); }
+    let clock = 0, prevState = 0;
+    function endSpeak() { speaking = false; lightWord(-1); setTalk(0); setState(prevState === 3 ? 0 : prevState); }
+    $("speak").addEventListener("click", () => {
+      if (speaking) return;
+      speaking = true; prevState = curState; bumps = [];
+      lipsync = true; $("lipsync").checked = true; stage.bool("lipsync", true); $("roTalk").hidden = false;
+      setState(3);
+      const synth = window.speechSynthesis;
+      let usedVoice = false;
+      if (synth && typeof SpeechSynthesisUtterance !== "undefined") {
+        try {
+          const u = new SpeechSynthesisUtterance(LINE);
+          u.rate = 1.02; u.pitch = 1.15;
+          let idx = 0;
+          u.onboundary = (e) => {
+            if (e.name && e.name !== "word") return;
+            usedVoice = true;
+            const before = LINE.slice(0, e.charIndex).split(" ").length - 1;
+            idx = Math.max(idx, before);
+            lightWord(idx); wordBump(words[idx] || "a", clock);
+          };
+          u.onend = () => setTimeout(endSpeak, 250);
+          u.onerror = () => { if (!usedVoice) fallback(); };
+          synth.cancel(); synth.speak(u);
+          setTimeout(() => { if (!usedVoice && speaking) { synth.cancel(); fallback(); } }, 900);
+          return;
+        } catch (err) { /* fall through */ }
+      }
+      fallback();
+      function fallback() {
+        let t = clock;
+        words.forEach((w, i) => { const at = t; setTimeout(() => lightWord(i), (at - clock) * 1000); wordBump(w, at); t += 0.16 + w.length * 0.045; });
+        setTimeout(endSpeak, (t - clock) * 1000 + 300);
+      }
+    });
+
+    // eye follow
+    let follow = false;
+    $("follow").addEventListener("change", (e) => {
+      follow = e.target.checked; stage.bool("follow", follow); $("followHint").hidden = !follow;
+      if (!follow) { stage.num("lookX", 0); stage.num("lookY", 0); $("lookOut").textContent = "lookX 0 \u00B7 lookY 0"; }
+    });
+    $("stage").addEventListener("pointermove", (e) => {
+      if (!follow) return;
+      const r = $("stage").getBoundingClientRect();
+      const sc = Math.min(r.width / 640, r.height / 760);
+      const ox = r.left + (r.width - 640 * sc) / 2, oy = r.top + (r.height - 760 * sc) / 2;
+      const ax = (e.clientX - ox) / sc, ay = (e.clientY - oy) / sc;
+      const lx = Math.max(-100, Math.min(100, (ax - 330) / 2.4));
+      const ly = Math.max(-100, Math.min(100, (ay - 300) / 2.2));
+      stage.num("lookX", lx); stage.num("lookY", ly);
+      $("lookOut").textContent = "lookX " + Math.round(lx) + " \u00B7 lookY " + Math.round(ly);
+    });
+
+    // ---------------- app phone: hero + bubble
+    const app = $("appview");
+    const heroC = $("heroCanvas"), bubC = $("bubbleCanvas");
+    // positions in screenshot pixels (839 x 1631)
+    const HERO = { x: 181, y: 116, w: 419, h: 497 }, BUB = { x: 664, y: 1018, w: 150, h: 150 };
+    function place(c, r) { c.style.left = (r.x / 839 * 100) + "%"; c.style.top = (r.y / 1631 * 100) + "%"; c.style.width = (r.w / 839 * 100) + "%"; c.style.height = (r.h / 1631 * 100) + "%"; }
+    place(heroC, HERO); place(bubC, BUB);
+    const hero = inst("Forseo", "Forseo");
+    const bub = inst("ForseoBubble", "Bubble");
+    surface(heroC, [{ i: hero }]);
+    surface(bubC, [{ i: bub }]);
+    let inBubble = false;
+    $("toBubble").addEventListener("click", () => {
+      if (inBubble) return; inBubble = true;
+      const dx = (BUB.x + BUB.w / 2) - (HERO.x + HERO.w / 2), dy = (BUB.y + BUB.h / 2) - (HERO.y + HERO.h / 2);
+      heroC.style.transform = "translate(" + (dx / HERO.w * 100) + "%," + (dy / HERO.h * 100) + "%) scale(.18)";
+      heroC.style.opacity = "0"; $("speech").classList.add("gone");
+      setTimeout(() => bub.fire("popIn"), reduce ? 0 : 380);
+      $("toBubble").disabled = true; $("toHero").disabled = false;
+    });
+    $("toHero").addEventListener("click", () => {
+      if (!inBubble) return; inBubble = false;
+      bub.fire("popOut");
+      setTimeout(() => { heroC.style.transform = ""; heroC.style.opacity = "1"; $("speech").classList.remove("gone"); hero.fire("wave"); }, reduce ? 0 : 260);
+      $("toBubble").disabled = false; $("toHero").disabled = true;
+    });
+    document.querySelectorAll("#bubbleStates button").forEach((b) => b.addEventListener("click", () => {
+      bub.num("state", +b.dataset.v);
+      sizes.forEach((s) => s.num("state", +b.dataset.v));
+      document.querySelectorAll("#bubbleStates button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      if (!inBubble) $("toBubble").click();
+    }));
+
+    // actual size bubbles
+    const sizes = [64, 72, 80].map((px) => { const s = inst("ForseoBubble", "Bubble"); surface($("sz" + px), [{ i: s }]); s.fire("popIn"); return s; });
+
+    // intro
+    stage.fire("wave");
+    hero.fire("wave");
+
+    // ---------------- loop
+    let last = 0;
+    function frame(t) {
+      const dt = last ? Math.min(0.05, (t - last) / 1000) : 0;
+      last = t; clock += dt;
+      if (speaking && lipsync) {
+        let v = 0;
+        for (const b of bumps) {
+          const d = clock - b.t;
+          if (d < -0.05 || d > 0.2) continue;
+          const up = d < 0 ? 1 + d / 0.05 : d < 0.06 ? 1 : 1 - (d - 0.06) / 0.14;
+          v = Math.max(v, b.peak * Math.max(0, Math.min(1, up)));
+        }
+        setTalk(talkVal + (v - talkVal) * Math.min(1, dt * 22));
+      }
+      for (const s of surfaces) {
+        fit(s);
+        for (const it of s.items) { it.i.m.advance(dt); it.i.a.advance(dt); }
+        s.r.clear();
+        for (const it of s.items) {
+          s.r.save();
+          s.r.align(rive.Fit.contain, rive.Alignment.center, { minX: 0, minY: 0, maxX: s.w, maxY: s.h }, it.i.a.bounds);
+          it.i.a.draw(s.r);
+          s.r.restore();
+        }
+      }
+      rive.requestAnimationFrame(frame);
+    }
+    rive.requestAnimationFrame(frame);
+
+    $("copy").addEventListener("click", () => {
+      const text = $("snippet").innerText;
+      const done = () => { $("copy").textContent = "Copied"; setTimeout(() => ($("copy").textContent = "Copy"), 1400); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => selectSnippet());
+      else selectSnippet();
+      function selectSnippet() { const r = document.createRange(); r.selectNodeContents($("snippet")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+    });
+  }
+  boot().catch((e) => { $("loading").textContent = "The runtime failed to start: " + e.message; console.error(e); });
+})();
+</script>
+
+</body>
+</html>
